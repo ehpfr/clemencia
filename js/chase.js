@@ -217,6 +217,67 @@ window.CLEM = window.CLEM || {};
     glow.rotation.y = Math.atan2(fp.tan.x, fp.tan.z) + Math.PI;
     scene.add(glow);
 
+    /* obstacles: three kinds, each asking for a different move */
+    var obstacles = [];
+    var obsMat = C.psp.apply(new THREE.MeshBasicMaterial({ map: C.scanTexture(77, true), color: 0x4e4e4e }));
+    var obsBox = new THREE.BoxGeometry(1, 1, 1);
+
+    function addObstacle(os, kind) {
+      var info = path.at(os);
+      var n = new THREE.Vector3(info.tan.z, 0, -info.tan.x);
+      var o = { s: os, kind: kind, halfDepth: 0.6 };
+      if (kind === 'jump') {
+        o.latMin = -3.4; o.latMax = 3.4; o.yMin = 0; o.yMax = 0.7;
+      } else if (kind === 'crouch') {
+        o.latMin = -3.4; o.latMax = 3.4; o.yMin = 1.15; o.yMax = 3.6;
+      } else {
+        var dir = rng() < 0.5 ? -1 : 1;
+        o.latMin = dir < 0 ? -3.6 : -0.5;
+        o.latMax = dir < 0 ? 0.5 : 3.6;
+        o.yMin = 0; o.yMax = 4.6;
+      }
+      obstacles.push(o);
+
+      var m = new THREE.Mesh(obsBox, obsMat);
+      var lat = (o.latMin + o.latMax) / 2;
+      m.position.copy(info.pos).add(n.clone().multiplyScalar(lat));
+      m.position.y = (o.yMin + o.yMax) / 2;
+      m.scale.set(o.latMax - o.latMin, o.yMax - o.yMin, o.halfDepth * 2);
+      m.rotation.y = Math.atan2(info.tan.x, info.tan.z);
+      scene.add(m);
+    }
+
+    var kinds = ['jump', 'crouch', 'side'];
+    var os = 30;
+    var kindIdx = rng() * 3 | 0;
+    while (os < finishS - 16) {
+      addObstacle(os, kinds[kindIdx % 3]);
+      kindIdx += 1 + (rng() * 2 | 0);
+      os += 21 + rng() * 13;
+    }
+
+    /* horizontal overlap in path space, padded by the player's radius */
+    function nearObstacles(ps, lateral, radius, pad) {
+      var hit = [], i, o;
+      for (i = 0; i < obstacles.length; i++) {
+        o = obstacles[i];
+        if (Math.abs(ps - o.s) < o.halfDepth + radius + (pad || 0) &&
+            lateral + radius + (pad || 0) > o.latMin &&
+            lateral - radius - (pad || 0) < o.latMax) {
+          hit.push(o);
+        }
+      }
+      return hit;
+    }
+
+    function blockedAt(ps, lateral, radius, feetY, height) {
+      var hit = nearObstacles(ps, lateral, radius), i;
+      for (i = 0; i < hit.length; i++) {
+        if (feetY + 0.06 < hit[i].yMax && feetY + height > hit[i].yMin) return true;
+      }
+      return false;
+    }
+
     /* the pursuer */
     var mCanvas = C.monsterCanvas();
     var monsterMat = new THREE.MeshBasicMaterial({
@@ -234,14 +295,15 @@ window.CLEM = window.CLEM || {};
     var state = {
       scene: scene,
       path: path,
+      obstacles: obstacles,
       monster: monster,
       monsterCanvas: mCanvas,
       finishS: finishS,
-      spawn: path.pts[0].clone().setY(1.62),
+      spawn: path.pts[0].clone().setY(0),
       spawnYaw: Math.atan2(-path.at(0).tan.x, -path.at(0).tan.z),
       hint: 1,
       playerS: 0,
-      monsterS: -26,
+      monsterS: -30,
       time: 0,
       lungeAt: 6.5,
       caught: false,
@@ -252,7 +314,7 @@ window.CLEM = window.CLEM || {};
     state.reset = function () {
       state.hint = 1;
       state.playerS = 0;
-      state.monsterS = -26;
+      state.monsterS = -30;
       state.time = 0;
       state.lungeAt = 6.5;
       state.caught = false;
@@ -260,8 +322,9 @@ window.CLEM = window.CLEM || {};
       state.proximity = 0;
     };
 
-    /* keep the player on the road, clamped to the corridor */
-    state.collide = function (next, prev, radius) {
+    /* keep the player on the road, clamped to the corridor, and stop them
+       walking through anything they were meant to get over or under */
+    state.collide = function (next, prev, radius, player) {
       var pr = path.project(next, state.hint);
       if (!pr) return;
       state.hint = pr.index;
@@ -278,23 +341,56 @@ window.CLEM = window.CLEM || {};
         next.z = startFix.pos.z + pr.normal.z * pr.lateral;
         pr.s = 0.6;
       }
+
+      var height = player ? player.height() : 1.75;
+      var feetY = next.y;
+      if (blockedAt(pr.s, pr.lateral, radius, feetY, height)) {
+        var back = path.project(prev, state.hint);
+        /* only refuse the step if where they came from was clear, so
+           landing badly never wedges them in place */
+        if (back && !blockedAt(back.s, back.lateral, radius, feetY, height)) {
+          next.x = prev.x;
+          next.z = prev.z;
+          pr = back;
+        }
+      }
+      state.hint = pr.index;
       state.playerS = pr.s;
-      next.y = 1.62;
+    };
+
+    /* the low barriers can be landed on */
+    state.groundHeight = function (p, player) {
+      var pr = path.project(p, state.hint);
+      if (!pr) return 0;
+      var hit = nearObstacles(pr.s, pr.lateral, 0, 0.1), i, top = 0;
+      for (i = 0; i < hit.length; i++) {
+        if (hit[i].yMin <= 0.01 && hit[i].yMax < 1.0 &&
+            p.y >= hit[i].yMax - 0.06 && hit[i].yMax > top) {
+          top = hit[i].yMax;
+        }
+      }
+      return top;
+    };
+
+    state.canStand = function (p, player) {
+      var pr = path.project(p, state.hint);
+      if (!pr) return true;
+      return !blockedAt(pr.s, pr.lateral, player.radius, p.y, player.standHeight);
     };
 
     state.update = function (dt, camera) {
       state.time += dt;
       var progress = state.playerS / path.total;
 
-      /* it gets faster the longer this goes on */
-      var speed = 4.6 + progress * 3.6 + Math.min(2.2, state.time * 0.045);
+      /* it gains on you, but a sprint always beats it */
+      var speed = 4.2 + progress * 1.5;
       state.monsterS += speed * dt;
 
       /* and every so often it stops pretending to walk */
       if (state.time > state.lungeAt) {
-        state.lungeAt = state.time + 6 + Math.random() * 5;
+        state.lungeAt = state.time + 8 + Math.random() * 5;
         var gap = state.playerS - state.monsterS;
-        if (gap > 6) state.monsterS += gap * 0.42;
+        if (gap > 12) state.monsterS += gap * 0.22;
       }
       if (state.monsterS < state.playerS - 34) state.monsterS = state.playerS - 34;
 

@@ -113,7 +113,10 @@ window.CLEM = window.CLEM || {};
         next.x *= (FIELD / 2 - 8) / r;
         next.z *= (FIELD / 2 - 8) / r;
       }
-      next.y = terrainHeight(next.x, next.z) + 1.62;
+    }
+
+    function groundHeight(p) {
+      return terrainHeight(p.x, p.z);
     }
 
     function reachedDoor(p) {
@@ -122,11 +125,12 @@ window.CLEM = window.CLEM || {};
     }
 
     var spawn = new THREE.Vector3(-16, 0, 25);
-    spawn.y = terrainHeight(spawn.x, spawn.z) + 1.62;
+    spawn.y = terrainHeight(spawn.x, spawn.z);
 
     return {
       scene: scene,
       collide: collide,
+      groundHeight: groundHeight,
       reachedDoor: reachedDoor,
       spawn: spawn,
       spawnYaw: -0.58,
