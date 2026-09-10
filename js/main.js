@@ -21,6 +21,9 @@
   var player = new C.Player(camera, canvas);
   var grain = new C.Grain(grainCanvas);
 
+  var touchControls = document.getElementById('touch-controls');
+  var isTouch = ('ontouchstart' in window);
+
   var exterior = null;
   var chase = null;
   var mode = 'title';
@@ -41,11 +44,9 @@
 
   function startExterior() {
     if (!exterior) exterior = C.buildExterior();
-    player.pos.copy(exterior.spawn);
-    player.yaw = exterior.spawnYaw;
+    player.reset(exterior.spawn.x, exterior.spawn.y, exterior.spawn.z, exterior.spawnYaw);
     player.pitch = -0.03;
-    player.speed = 4.3;
-    player.extraRoll = 0;
+    player.walkSpeed = 4.6;
     camera.fov = 72;
     camera.updateProjectionMatrix();
     C.psp.setJitter(190);
@@ -54,18 +55,19 @@
     mode = 'exterior';
     stateTime = 0;
     player.enabled = true;
+    show(touchControls, isTouch);
     show(hintEl, true);
-    hintEl.textContent = 'WASD / arrows to move · mouse to look';
-    setTimeout(function () { if (mode === 'exterior') hintEl.textContent = 'find the way in'; }, 7000);
+    hintEl.textContent = isTouch
+      ? 'left side moves · right side looks'
+      : 'WASD move · shift sprint · space jump · C crouch';
+    setTimeout(function () { if (mode === 'exterior') hintEl.textContent = 'find the way in'; }, 8000);
   }
 
   function startChase(fresh) {
     if (!chase) chase = C.buildChase();
     if (fresh) chase.reset();
-    player.pos.copy(chase.spawn);
-    player.yaw = chase.spawnYaw;
-    player.pitch = 0;
-    player.speed = 7.6;
+    player.reset(chase.spawn.x, chase.spawn.y, chase.spawn.z, chase.spawnYaw);
+    player.walkSpeed = 4.6;
     camera.fov = 80;
     camera.updateProjectionMatrix();
     grain.intensity = 0.1;
@@ -73,9 +75,16 @@
     mode = 'chase';
     stateTime = 0;
     player.enabled = true;
+    show(touchControls, isTouch);
     show(hintEl, true);
     hintEl.textContent = 'run';
-    setTimeout(function () { if (mode === 'chase') show(hintEl, false); }, 2600);
+    setTimeout(function () {
+      if (mode !== 'chase') return;
+      hintEl.textContent = isTouch
+        ? 'sprint · jump · crouch'
+        : 'shift to sprint · space to jump · C to crouch';
+    }, 2200);
+    setTimeout(function () { if (mode === 'chase') show(hintEl, false); }, 7000);
   }
 
   function toChase() {
@@ -90,11 +99,13 @@
     mode = 'ending';
     player.enabled = false;
     show(hintEl, false);
+    show(touchControls, false);
     stateTime = 0;
     if (document.exitPointerLock) document.exitPointerLock();
   }
 
   function jumpscare() {
+    show(touchControls, false);
     scareEl.style.backgroundImage = 'url(' + chase.monsterCanvas.toDataURL() + ')';
     show(scareEl, true);
     scareTimer = 0.85;
@@ -122,7 +133,6 @@
     if (mode === 'exterior' || mode === 'chase') player.requestLock();
   });
 
-  var isTouch = ('ontouchstart' in window);
   if (isTouch) {
     document.getElementById('controls-note').textContent = 'left side to move · right side to look';
   }
@@ -135,34 +145,24 @@
 
     if (mode === 'exterior') {
       show(pauseEl, !player.locked && !isTouch);
-      player.update(dt, exterior.collide);
+      player.update(dt, exterior);
       if (exterior.reachedDoor(player.pos)) toChase();
       setFade(Math.max(0, fadeVal - dt * 2));
     } else if (mode === 'transition') {
       /* a hard cut through static */
       setFade(Math.min(1, stateTime * 2.2));
-      C.psp.setJitter(190 - Math.min(150, stateTime * 260));
       grain.intensity = 0.05 + Math.min(0.55, stateTime * 0.8);
       if (stateTime > 0.95) {
         show(glitchEl, false);
         grain.intensity = 0.1;
-        C.psp.setJitter(160);
+        C.psp.setJitter(165);
         startChase(true);
         setFade(1);
       }
     } else if (mode === 'chase') {
       show(pauseEl, !player.locked && !isTouch);
-      player.update(dt, chase.collide);
+      player.update(dt, chase);
       var st = chase.update(dt, camera);
-      var prox = st.proximity;
-
-      /* everything degrades as it closes */
-      C.psp.setJitter(165 - prox * 85);
-      grain.intensity = 0.09 + prox * 0.22;
-      player.extraRoll = Math.sin(stateTime * 1.7) * 0.02 + prox * Math.sin(stateTime * 9) * 0.05;
-      camera.fov = 80 + prox * 9 + Math.sin(stateTime * 3.1) * 1.5;
-      camera.updateProjectionMatrix();
-      chase.scene.fog.far = 62 - prox * 20;
 
       setFade(Math.max(0, fadeVal - dt * 1.6));
       if (st.caught) jumpscare();
@@ -173,6 +173,7 @@
         show(scareEl, false);
         setFade(1);
         startChase(true);
+        show(touchControls, isTouch);
       }
     } else if (mode === 'ending') {
       setFade(Math.min(1, stateTime * 1.6));

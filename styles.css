@@ -166,15 +166,65 @@ html, body {
   z-index: 10;
 }
 #ending.on { display: flex; }
-#ending span {
+.ending-lines {
+  text-align: center;
   font-family: "Times New Roman", Times, serif;
-  font-size: clamp(34px, 7vw, 86px);
   color: #e6e6e6;
-  letter-spacing: 0.08em;
+  padding: 0 20px;
+}
+.ending-lines > div {
   opacity: 0;
-  animation: reveal 4s ease-in forwards;
+  animation: reveal 2.6s ease-in forwards;
+}
+.ending-title {
+  font-size: clamp(34px, 7vw, 86px);
+  letter-spacing: 0.08em;
+}
+.ending-date {
+  margin-top: clamp(14px, 2.6vw, 28px);
+  font-size: clamp(17px, 2.6vw, 30px);
+  letter-spacing: 0.22em;
+  color: #c2c2c2;
+  animation-delay: 1.6s;
+}
+.ending-studio {
+  margin-top: clamp(10px, 1.8vw, 18px);
+  font-size: clamp(15px, 2.1vw, 25px);
+  letter-spacing: 0.3em;
+  color: #9d9d9d;
+  animation-delay: 3s;
 }
 @keyframes reveal {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* touch-only action buttons */
+#touch-controls {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 4;
+}
+#touch-controls.on { display: flex; }
+.touch-btn {
+  width: 84px;
+  padding: 12px 0;
+  border: 1px solid rgba(226, 226, 226, 0.35);
+  border-radius: 3px;
+  background: rgba(12, 12, 12, 0.42);
+  color: rgba(232, 232, 232, 0.82);
+  font-family: "Times New Roman", Times, serif;
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  text-transform: lowercase;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+.touch-btn.held {
+  background: rgba(226, 226, 226, 0.24);
+  color: #fff;
 }
