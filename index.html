@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>clemencia</title>
+<meta name="description" content="A short first-person horror piece.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000'/></svg>">
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <canvas id="grain"></canvas>
+  <div id="vignette"></div>
+  <div id="glitch"></div>
+  <div id="fade"></div>
+
+  <div id="hint" class="overlay-text"></div>
+
+  <div id="title" class="screen on">
+    <div class="title-inner">
+      <div id="title-action">loading</div>
+      <div id="controls-note">WASD to move · mouse to look</div>
+    </div>
+  </div>
+
+  <div id="pause" class="screen">
+    <div class="title-inner"><div>click to resume</div></div>
+  </div>
+
+  <div id="jumpscare"></div>
+
+  <div id="ending"><span>Clemencia</span></div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+window.addEventListener('error', function () {
+  var t = document.getElementById('title-action');
+  if (t && !window.THREE) t.textContent = 'could not load renderer';
+});
+</script>
+<script src="js/textures.js"></script>
+<script src="js/psp.js"></script>
+<script src="js/player.js"></script>
+<script src="js/exterior.js"></script>
+<script src="js/chase.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
